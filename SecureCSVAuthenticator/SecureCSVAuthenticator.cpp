@@ -9,8 +9,9 @@ This program will prompt the user for login information and check it against an 
 
 #include "SecureCSVAuthenticator.h"
 
+enum userDBStatus {userFoundWithPass = 1,userFoundBadPass = 2,userNotFound = 3,fileError = -1};
 
-int searchAccounts(std::string user, std::string pwd, int KEY);
+userDBStatus searchAccounts(std::string user, std::string pwd, int KEY);
 bool addNewAccount(const std::string& user, const std::string& pwd, int KEY);
 std::string encryptString(const std::string& iString, int shift);
 std::string decryptString(std::string iString, int shift);
@@ -34,17 +35,17 @@ int main() {
 
         std::cout << "Searching User...\n";
 
-        if (searchAccounts(userName, password, KEY) == 1) {
+        if (searchAccounts(userName, password, KEY) == userFoundWithPass) {
             // Username and corrosponding Password are found in database
             std::cout << "ACCESS GRANTED!";
             return 0;
         }
-        if (searchAccounts(userName, password, KEY) == 2) {
+        if (searchAccounts(userName, password, KEY) == userFoundBadPass) {
             // The Username was found, but with a different Password
             std::cout << "Wrong Password, " << attempts - 1 << " attempts remaining.\n";
             attempts--;
         }
-        if (searchAccounts(userName, password, KEY) == 3) {
+        if (searchAccounts(userName, password, KEY) == userNotFound) {
             // The Username does not exist in the database, the User is prompted to create a new account
             char response;
             std::cout << "User Not Found, create an account?\n(Y or N): ";
@@ -74,17 +75,18 @@ int main() {
     return 0;
 }
 
+
 // Function will return:
 // 1 if Username and matching Password are found
 // 2 if Username found, Password is incorrect
 // 3 if Username not found
 // -1 if file error
-int searchAccounts(std::string user, std::string pwd, int KEY) {
+userDBStatus searchAccounts(std::string user, std::string pwd, int KEY) {
     // Open database file
     std::ifstream in("accounts.csv");
     if (!in) {
         std::cout << "\nError opening file for reading.\n";
-        return -1;
+        return fileError;
     }
     else {
 
@@ -109,13 +111,13 @@ int searchAccounts(std::string user, std::string pwd, int KEY) {
 
                     if (decryptString(cursor, KEY) == pwd) {
                         // The password matches
-                        return 1; // User found, Correct Password
+                        return userFoundWithPass; // User found, Correct Password
                     }
                 }
-                return 2; // User Found, Wrong Password
+                return userFoundBadPass; // User Found, Wrong Password
             }
         }
-        return 3; // User was not found
+        return userNotFound; // User was not found
 
         in.close();
     }
@@ -132,7 +134,7 @@ bool addNewAccount(const std::string& user, const std::string& pwd, int KEY) {
         return false;
     }
     // Check if the Username is taken
-    if (searchAccounts(user, pwd, KEY) == 1 || searchAccounts(user, pwd, KEY) == 2) {
+    if (searchAccounts(user, pwd, KEY) == userFoundWithPass || searchAccounts(user, pwd, KEY) == userFoundBadPass) {
         std::cout << "Username Taken! Please Try Again.\n";
         return false;
     }
