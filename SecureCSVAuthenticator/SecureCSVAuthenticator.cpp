@@ -18,6 +18,7 @@ std::string decryptString(std::string iString);
 int getKey();
 
 int main() {
+    std::cout << getKey() << "\n"; // DEBUG TODO: remove
     std::string userName;
     std::string password;
     int attempts = 3;
