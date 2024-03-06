@@ -2,7 +2,7 @@
 
 /*
 Daniel Wilson
-3/5/2024
+3/6/2024
 Secure CSV Authenticator
 This program will prompt the user for login information and check it against an encrypted csv 'database'.
 */
@@ -34,43 +34,52 @@ int main() {
         //std::cout << "\n\n";
 
         std::cout << "Searching User...\n";
-        
-        if (searchAccounts(userName, password) == userFoundWithPass) {
-            // Username and corrosponding Password are found in database
-            std::cout << "ACCESS GRANTED!";
-            return 0;
-        }
-        if (searchAccounts(userName, password) == userFoundBadPass) {
-            // The Username was found, but with a different Password
-            std::cout << "Wrong Password, " << attempts - 1 << " attempts remaining.\n";
-            attempts--;
-        }
-        if (searchAccounts(userName, password) == userNotFound) {
-            // The Username does not exist in the database, the User is prompted to create a new account
-            char response;
-            std::cout << "User Not Found, create an account?\n(Y or N): ";
-            std::cin >> response;
-            if (response == 'Y' || response == 'y') {
-                bool creatingNewAcc = true;
-                while (creatingNewAcc) { // Try until a unique username is provided
+        userDBStatus status = searchAccounts(userName, password);
 
-                    std::string newUsername, newPassword;
-                    std::cout << "Enter new username and password: \n";
-                    std::cin >> newUsername;
-                    std::cin >> newPassword;
+        switch (status) {
+            case userFoundWithPass:
+                std::cout << "ACCESS GRANTED!";
+                return 0;
+            case userFoundBadPass:
+                std::cout << "Wrong Password, " << attempts - 1 << " attempts remaining.\n";
+                attempts--;
+                break;
+            case userNotFound:
+                char response;
+                std::cout << "User Not Found, create an account?\n(Y or N): ";
+                std::cin >> response;
+                if (response == 'Y' || response == 'y') {
+                    bool creatingNewAcc = true;
+                    while (creatingNewAcc) { // Try until a unique username is provided
 
-                    if (addNewAccount(newUsername, newPassword)) {
-                        std::cout << "Account Created! ";
-                        creatingNewAcc = false;
+                        std::string newUsername, newPassword;
+                        std::cout << "Enter new username and password: \n";
+                        std::cin >> newUsername;
+                        std::cin >> newPassword;
+
+                        if (addNewAccount(newUsername, newPassword)) {
+                            std::cout << "Account Created! ";
+                            creatingNewAcc = false;
+                        }
                     }
                 }
-            }
-            else {
+                else {
+                    // TODO: Handle other cases
+                }
+                std::cout << "Please Log In.\n";
                 break;
-            }
-            std::cout << "Please Log In.\n";
+            case fileError:
+                std::cerr << "Error opening file for reading.\n";
+                // TODO: Handle file error
+                break;
+            case unexpectedError:
+                std::cerr << "Unexpected error occurred.\n";
+                // TODO: Handle unexpected error
+                break;
+            default:
+                // TODO: Handle other cases
+                break;
         }
-
     }
     return 0;
 }
