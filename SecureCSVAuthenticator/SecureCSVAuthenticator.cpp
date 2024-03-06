@@ -2,14 +2,14 @@
 
 /*
 Daniel Wilson
-2/22/2024
+3/5/2024
 Secure CSV Authenticator
 This program will prompt the user for login information and check it against an encrypted csv 'database'.
 */
 
 #include "SecureCSVAuthenticator.h"
 
-enum userDBStatus {userFoundWithPass = 1,userFoundBadPass = 2,userNotFound = 3,fileError = -1};
+enum userDBStatus {userFoundWithPass = 1,userFoundBadPass = 2,userNotFound = 3,fileError = -1,unexpectedError = -2};
 
 userDBStatus searchAccounts(std::string user, std::string pwd);
 bool addNewAccount(const std::string& user, const std::string& pwd);
@@ -18,7 +18,6 @@ std::string decryptString(std::string iString);
 int getKey();
 
 int main() {
-    std::cout << getKey() << "\n"; // DEBUG TODO: remove
     std::string userName;
     std::string password;
     int attempts = 3;
@@ -35,7 +34,7 @@ int main() {
         //std::cout << "\n\n";
 
         std::cout << "Searching User...\n";
-
+        
         if (searchAccounts(userName, password) == userFoundWithPass) {
             // Username and corrosponding Password are found in database
             std::cout << "ACCESS GRANTED!";
@@ -82,14 +81,15 @@ int main() {
 // 2 if Username found, Password is incorrect
 // 3 if Username not found
 // -1 if file error
+// -2 if unexpected error
 userDBStatus searchAccounts(std::string user, std::string pwd) {
-    // Open database file
-    std::ifstream in("accounts.csv");
-    if (!in) {
-        std::cout << "\nError opening file for reading.\n";
-        return fileError;
-    }
-    else {
+    try {
+        // Open database file
+        std::ifstream in("accounts.csv");
+        if (!in) {
+            std::cout << "\nError opening file for reading.\n";
+            throw fileError;
+        }
 
         // Convert input to lowercase to compare
         std::transform(user.begin(), user.end(), user.begin(), ::tolower);
@@ -118,72 +118,96 @@ userDBStatus searchAccounts(std::string user, std::string pwd) {
                 return userFoundBadPass; // User Found, Wrong Password
             }
         }
-        return userNotFound; // User was not found
-
         in.close();
+        return userNotFound; // User was not found
+    }
+    catch (const std::exception& e) {
+        std::cerr << "Exception occurred: " << e.what() << "\n";
+        return unexpectedError; // Handle other exceptions (i.e. decryption error)
     }
 }
 
 // Function will fail for file error or if username already exists.
 bool addNewAccount(const std::string& user, const std::string& pwd) {
-    std::cout << "Creating New Account for " << user << "...\n";
-    // Open database file
-    std::ofstream out;
-    out.open("accounts.csv", std::ios_base::app);
-    if (!out) {
-        std::cout << "\nError opening file for writing to.\n";
-        return false;
+    try {
+        std::cout << "Creating New Account for " << user << "...\n";
+        // Open database file
+        std::ofstream out;
+        out.open("accounts.csv", std::ios_base::app);
+        if (!out) {
+            throw std::runtime_error("Error opening file for writing to.");
+        }
+
+        // Check if the Username is taken
+        if (searchAccounts(user, pwd) == userFoundWithPass || searchAccounts(user, pwd) == userFoundBadPass) {
+            throw std::runtime_error("Username Taken! Please Try Again.");
+        }
+
+        // Encrypt data before writing to file
+        out << encryptString(user) << "\n" << encryptString(pwd) << "\n";
+        out.close();
+        return true;
     }
-    // Check if the Username is taken
-    if (searchAccounts(user, pwd) == userFoundWithPass || searchAccounts(user, pwd) == userFoundBadPass) {
-        std::cout << "Username Taken! Please Try Again.\n";
+    catch (const std::exception& e) {
+        std::cerr << "Exception occurred: " << e.what() << "\n";
         return false;
     }
 
-    // Encrypt data before writing to file
-    out << encryptString(user) << "\n" << encryptString(pwd) << "\n";
-    out.close();
-    return true;
 }
 
 // 'Ceasar Cypher', letters are shifted down in the alphabet
 std::string encryptString(const std::string& iString) {
-    std::string result = "";
-    for (char c : iString) {
-        if (std::isalpha(c)) {
-            char shiftedChar = (std::tolower(c) - 'a' + getKey()) % 26 + 'a';
-            result += shiftedChar;
+    try {
+        std::string result = "";
+        for (char c : iString) {
+            if (std::isalpha(c)) {
+                char shiftedChar = (std::tolower(c) - 'a' + getKey()) % 26 + 'a';
+                result += shiftedChar;
+            }
+            else {
+                result += c; // non alphabetic characters are left unchanged
+            }
         }
-        else {
-            result += c; // non alphabetic characters are left unchanged
-        }
+        return result;
     }
-    return result;
+    catch (const std::exception& e) {
+        std::cerr << "Exception occurred: " << e.what() << "\n";
+    }
 }
 
 // 'Ceasar Cypher' is reversed, letters are shifted back in the alphabet
 std::string decryptString(std::string iString) {
-    std::string result = "";
-    for (char c : iString) {
-        if (std::isalpha(c)) {
-            char shiftedChar = (std::tolower(c) - 'a' - getKey() + 26) % 26 + 'a';
-            result += shiftedChar;
+    try {
+        std::string result = "";
+        for (char c : iString) {
+            if (std::isalpha(c)) {
+                char shiftedChar = (std::tolower(c) - 'a' - getKey() + 26) % 26 + 'a';
+                result += shiftedChar;
+            }
+            else {
+                result += c; // non alphabetic characters left unchanged
+            }
         }
-        else {
-            result += c; // non alphabetic characters left unchanged
-        }
+        return result;
     }
-    return result;
+    catch (const std::exception& e) {
+        std::cerr << "Exception occurred: " << e.what() << "\n";
+    }
 }
 
 int getKey() {
-    std::ifstream in("key.txt");
-    if (!in) {
-        std::cout << "\nError retrieving key.\n";
+    try {
+        std::ifstream in("key.txt");
+        if (!in) {
+            throw std::runtime_error("Error retrieving key.");
+        }
+        int key;
+        in >> key;
+        in.close();
+        return key;
+    }
+    catch (const std::exception& e) {
+        std::cerr << "Exception occurred: " << e.what() << "\n";
         return -1;
     }
-    int key;
-    in >> key;
-    in.close();
-    return key;
 }
